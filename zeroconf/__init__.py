@@ -956,9 +956,9 @@ class DNSOutgoing:
         """Writes an unsigned short to the packet"""
         self.pack(b'!H', value)
 
-    def write_int(self, value: Union[float, int]) -> None:
+    def write_int(self, value: int) -> None:
         """Writes an unsigned integer to the packet"""
-        self.pack(b'!I', int(value))
+        self.pack(b'!I', value)
 
     def write_string(self, value: bytes) -> None:
         """Writes a string to the packet"""
