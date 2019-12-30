@@ -169,7 +169,7 @@ class PacketGeneration(unittest.TestCase):
             "testname1.local.", r._TYPE_SRV, r._CLASS_IN, r._DNS_HOST_TTL, 0, 0, 80, "foo.local."
         )
         staleanswer2 = r.DNSService(
-            "testname2.local.", r._TYPE_SRV, r._CLASS_IN, r._DNS_HOST_TTL / 2, 0, 0, 80, "foo.local."
+            "testname2.local.", r._TYPE_SRV, r._CLASS_IN, r._DNS_HOST_TTL // 2, 0, 0, 80, "foo.local."
         )
         answer2 = r.DNSService(
             "testname2.local.", r._TYPE_SRV, r._CLASS_IN, r._DNS_HOST_TTL, 0, 0, 80, "foo.local."

@@ -450,9 +450,10 @@ class DNSRecord(DNSEntry):
 
     """A DNS record - like a DNS entry, but has a TTL"""
 
-    # TODO: Switch to just int ttl
-    def __init__(self, name: str, type_: int, class_: int, ttl: Union[float, int]) -> None:
+    def __init__(self, name: str, type_: int, class_: int, ttl: int) -> None:
         DNSEntry.__init__(self, name, type_, class_)
+        # TODO: Remove this in future release once it's no longer helpful
+        assert isinstance(ttl, int), 'ttl needs to be an integer'
         self.ttl = ttl
         self.created = current_time_millis()
         self._expiration_time = self.get_expiration_time(100)
@@ -484,10 +485,9 @@ class DNSRecord(DNSEntry):
         by a certain percentage."""
         return self.created + (percent * self.ttl * 10)
 
-    # TODO: Switch to just int here
-    def get_remaining_ttl(self, now: float) -> Union[int, float]:
+    def get_remaining_ttl(self, now: float) -> int:
         """Returns the remaining TTL in seconds."""
-        return max(0, (self._expiration_time - now) / 1000.0)
+        return max(0, int(self._expiration_time - now) // 1000)
 
     def is_expired(self, now: float) -> bool:
         """Returns true if this record has expired."""
@@ -511,7 +511,7 @@ class DNSRecord(DNSEntry):
 
     def to_string(self, other: Union[bytes, str]) -> str:
         """String representation with additional information"""
-        arg = "%s/%s,%s" % (self.ttl, int(self.get_remaining_ttl(current_time_millis())), cast(Any, other))
+        arg = "%s/%s,%s" % (self.ttl, self.get_remaining_ttl(current_time_millis()), cast(Any, other))
         return DNSEntry.entry_to_string(self, "record", arg)
 
 
@@ -648,7 +648,7 @@ class DNSService(DNSRecord):
         name: str,
         type_: int,
         class_: int,
-        ttl: Union[float, int],
+        ttl: int,
         priority: int,
         weight: int,
         port: int,
