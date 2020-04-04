@@ -84,8 +84,6 @@ _BROWSER_BACKOFF_LIMIT = 3600  # s
 
 _MDNS_ADDR = '224.0.0.251'
 _MDNS_ADDR_BYTES = socket.inet_aton(_MDNS_ADDR)
-_MDNS_ADDR6 = 'ff02::fb'
-_MDNS_ADDR6_BYTES = socket.inet_pton(socket.AF_INET6, _MDNS_ADDR6)
 _MDNS_PORT = 5353
 _DNS_PORT = 53
 _DNS_HOST_TTL = 120  # two minute for host records (A, SRV etc) as-per RFC6762
@@ -315,7 +313,7 @@ def service_type_name(type_: str, *, allow_underscores: bool = False) -> str:
                 "Ascii control character 0x00-0x1F and 0x7F illegal in '%s'" % remaining[0]
             )
 
-    return '_' + name + type_[-len('._tcp.local.') :]
+    return '_' + name + type_[-len('._tcp.local.'):]
 
 
 # Exceptions
@@ -542,7 +540,7 @@ class DNSAddress(DNSRecord):
         try:
             return self.to_string(
                 socket.inet_ntop(
-                    socket.AF_INET6 if _is_v6_address(self.address) else socket.AF_INET, self.address
+                    socket.AF_INET, self.address
                 )
             )
         except Exception:  # TODO stop catching all Exceptions
@@ -720,7 +718,7 @@ class DNSIncoming(QuietLogger):
 
     def unpack(self, format_: bytes) -> tuple:
         length = struct.calcsize(format_)
-        info = struct.unpack(format_, self.data[self.offset : self.offset + length])
+        info = struct.unpack(format_, self.data[self.offset:self.offset + length])
         self.offset += length
         return info
 
@@ -756,7 +754,7 @@ class DNSIncoming(QuietLogger):
 
     def read_string(self, length: int) -> bytes:
         """Reads a string of a given length from the packet"""
-        info = self.data[self.offset : self.offset + length]
+        info = self.data[self.offset:self.offset + length]
         self.offset += length
         return info
 
@@ -815,7 +813,7 @@ class DNSIncoming(QuietLogger):
 
     def read_utf(self, offset: int, length: int) -> str:
         """Reads a UTF-8 string of a given length from the packet"""
-        return str(self.data[offset : offset + length], 'utf-8', 'replace')
+        return str(self.data[offset:offset + length], 'utf-8', 'replace')
 
     def read_name(self) -> str:
         """Reads a domain name from the packet"""
@@ -1379,7 +1377,7 @@ class ServiceBrowser(RecordUpdateListener, threading.Thread):
         self.type = type_
         self.addr = addr
         self.port = port
-        self.multicast = self.addr in (None, _MDNS_ADDR, _MDNS_ADDR6)
+        self.multicast = self.addr in (None, _MDNS_ADDR)
         self.services = {}  # type: Dict[str, DNSRecord]
         self.next_time = current_time_millis()
         self.delay = delay
@@ -1634,7 +1632,7 @@ class ServiceInfo(RecordUpdateListener):
         """List addresses in their parsed string form."""
         result = self.addresses_by_version(version)
         return [
-            socket.inet_ntop(socket.AF_INET6 if _is_v6_address(addr) else socket.AF_INET, addr)
+            socket.inet_ntop(socket.AF_INET, addr)
             for addr in result
         ]
 
@@ -1670,7 +1668,7 @@ class ServiceInfo(RecordUpdateListener):
         while index < end:
             length = text[index]
             index += 1
-            strs.append(text[index : index + length])
+            strs.append(text[index:index + length])
             index += length
 
         for s in strs:
@@ -2002,13 +2000,8 @@ def add_multicast_member(
     is_v6 = isinstance(interface, int)
     log.debug('Adding %r to multicast group', interface)
     try:
-        if is_v6:
-            iface_bin = struct.pack('@I', cast(int, interface))
-            _value = _MDNS_ADDR6_BYTES + iface_bin
-            listen_socket.setsockopt(_IPPROTO_IPV6, socket.IPV6_JOIN_GROUP, _value)
-        else:
-            _value = _MDNS_ADDR_BYTES + socket.inet_aton(cast(str, interface))
-            listen_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, _value)
+        _value = _MDNS_ADDR_BYTES + socket.inet_aton(cast(str, interface))
+        listen_socket.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, _value)
     except socket.error as e:
         _errno = get_errno(e)
         if _errno == errno.EADDRINUSE:
@@ -2035,12 +2028,9 @@ def add_multicast_member(
         ip_version=(IPVersion.V6Only if is_v6 else IPVersion.V4Only), apple_p2p=apple_p2p
     )
     log.debug('Configuring %s with multicast interface %s', respond_socket, interface)
-    if is_v6:
-        respond_socket.setsockopt(_IPPROTO_IPV6, socket.IPV6_MULTICAST_IF, iface_bin)
-    else:
-        respond_socket.setsockopt(
-            socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(cast(str, interface))
-        )
+    respond_socket.setsockopt(
+        socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(cast(str, interface))
+    )
     return respond_socket
 
 
@@ -2618,9 +2608,7 @@ class Zeroconf(QuietLogger):
             if self._GLOBAL_DONE:
                 return
             try:
-                if addr is None:
-                    real_addr = _MDNS_ADDR6 if s.family == socket.AF_INET6 else _MDNS_ADDR
-                elif not can_send_to(s, addr):
+                if not can_send_to(s, addr):
                     continue
                 else:
                     real_addr = addr
